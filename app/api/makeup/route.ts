@@ -36,7 +36,7 @@ export async function POST(req: Request) {
       messages: [
         {
           role: "system",
-          content: "你是一位男士理容专家。请针对用户拍照后的面部光影，给出一段极其精简（20字以内）的专业修容建议。"
+          content: "你是一位男士理容专家。请针对用户拍照后的面部特征，给出一段简单的专业修容建议。"
         },
         {
           role: "user",
