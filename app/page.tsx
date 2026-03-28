@@ -16,7 +16,7 @@ function CameraCapture({ onCapture }: { onCapture: (img: string) => void }) {
         });
         if (videoRef.current) videoRef.current.srcObject = s;
         setStream(s);
-      } catch (err) { alert("请允许摄像头权限"); }
+      } catch (err) { alert("请允许摄像头权限以开启实验"); }
     }
     setupCamera();
     return () => stream?.getTracks().forEach(t => t.stop());
@@ -110,11 +110,39 @@ export default function MakeupGame() {
     highlight: ['#FFF9C4', '#FEF3C7', '#FFFFFF'] 
   };
 
+  // 获取 AI 建议的函数
+  const fetchAiAdvice = async () => {
+    setAiAdvice("AI 正在深度扫描面部轮廓...");
+    try {
+      const res = await fetch('/api/makeup', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get_advice', faceShape: 'custom' }) 
+      });
+      const data = await res.json();
+      if (data.advice) {
+        setAiAdvice(data.advice);
+      } else {
+        setAiAdvice("建议：沿下颌线少量叠涂修容，在受光面使用柔和提亮。");
+      }
+    } catch (err) {
+      setAiAdvice("建议：沿下颌线少量叠涂修容，在受光面使用柔和提亮。");
+    }
+  };
+
+  // 拍照完成后的处理函数
+  const handleCapture = (img: string) => {
+    setCapturedImage(img);
+    setStep(2);
+    fetchAiAdvice(); // 重要：拍照完立刻触发分析
+  };
+
   const fetchFinalPersona = async () => {
     setIsAnalyzing(true);
     try {
       const res = await fetch('/api/makeup', { 
         method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'analyze_persona', image: capturedImage }) 
       });
       const data = await res.json();
@@ -124,10 +152,15 @@ export default function MakeupGame() {
         star: data.star || "金城武",
         img: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=400&fit=crop"
       });
-      setStep(3);
-    } catch {
-      setStep(3); // 即使失败也展示默认
+    } catch (err) {
+      setPersona({
+        name: "旷野诗人",
+        desc: "骨相中透着坚毅，细节处藏着柔和。展现出独特的理容美感。",
+        star: "陈坤",
+        img: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop"
+      });
     }
+    setStep(3);
     setIsAnalyzing(false);
   };
 
@@ -149,10 +182,9 @@ export default function MakeupGame() {
         <AnimatePresence mode="wait">
           {step !== 3 ? (
             <motion.div key="edit" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: 'grid', gridTemplateColumns: '470px 1fr', gap: '60px' }}>
-              {/* 左侧编辑器 */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center' }}>
                 {step === 1 ? (
-                  <CameraCapture onCapture={(img) => { setCapturedImage(img); setStep(2); }} />
+                  <CameraCapture onCapture={handleCapture} />
                 ) : (
                   <>
                     <ProfessionalCanvas capturedImage={capturedImage} toolConfig={{ ...toolModes[currentMode], size: brushSize }} undoTrigger={undoCounter} />
@@ -161,7 +193,6 @@ export default function MakeupGame() {
                 )}
               </div>
 
-              {/* 右侧控制台 */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
                 {step === 1 ? (
                   <div>
@@ -172,7 +203,7 @@ export default function MakeupGame() {
                   <div>
                     <div style={{ background: '#fff', borderLeft: '4px solid #D4AF37', padding: '30px', borderRadius: '0 20px 20px 0', boxShadow: '0 10px 30px rgba(0,0,0,0.03)', marginBottom: '40px' }}>
                       <p style={{ fontSize: '11px', color: '#D4AF37', fontWeight: 'bold', marginBottom: '10px', letterSpacing: '2px' }}>AI SUGGESTION</p>
-                      <p style={{ fontSize: '15px', fontStyle: 'italic' }}>{aiAdvice}</p>
+                      <p style={{ fontSize: '15px', fontStyle: 'italic', color: '#444' }}>{aiAdvice}</p>
                     </div>
                     
                     <div style={{ marginBottom: '35px' }}>
@@ -206,7 +237,6 @@ export default function MakeupGame() {
               </div>
             </motion.div>
           ) : (
-            /* Step 3: 杂志风结果页 */
             <motion.div key="s3" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} style={{ maxWidth: '900px', margin: '0 auto', display: 'grid', gridTemplateColumns: '450px 1fr', gap: '80px', alignItems: 'center' }}>
               <div style={{ position: 'relative' }}>
                 <div style={{ position: 'absolute', top: '-20px', left: '-20px', width: '100px', height: '100px', borderTop: '2px solid #D4AF37', borderLeft: '2px solid #D4AF37' }}></div>
@@ -216,13 +246,11 @@ export default function MakeupGame() {
                   <h2 style={{ fontSize: '64px', margin: '10px 0', fontWeight: '300' }}>{persona.name}</h2>
                 </div>
               </div>
-
               <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
                 <div>
                   <Quote size={48} style={{ color: '#D4AF37', opacity: 0.2, marginBottom: '20px' }} />
                   <p style={{ fontSize: '22px', lineHeight: '1.8', color: '#333', fontWeight: '300' }}>{persona.desc}</p>
                 </div>
-
                 <div style={{ paddingTop: '40px', borderTop: '1px solid #EEE' }}>
                   <p style={{ fontSize: '11px', color: '#999', letterSpacing: '3px', marginBottom: '25px' }}>SIMILAR ARCHETYPE / 相似明星</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '25px' }}>
